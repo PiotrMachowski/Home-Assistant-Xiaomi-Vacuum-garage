@@ -1,0 +1,81 @@
+script:
+  vacuum_close_garage:
+    sequence:
+      - condition: state
+        entity_id: switch.vacuum_garage
+        state: 'on'
+      - service: switch.turn_off
+        entity_id: switch.vacuum_garage
+
+  vacuum_open_garage:
+    sequence:
+      - condition: state
+        entity_id: switch.vacuum_garage
+        state: 'off'
+      - service: switch.turn_on
+        entity_id: switch.vacuum_garage
+
+  vacuum_leave_garage:
+    sequence:
+      - condition: state
+        entity_id: vacuum.xiaomi_vacuum
+        state: 'docked'
+      - service: script.vacuum_open_garage
+      - wait_template: "{{ is_state('switch.vacuum_garage', 'on') }}"
+      - service: vacuum.xiaomi_remote_control_start
+        data:
+          entity_id: vacuum.xiaomi_vacuum
+      - delay: "00:00:8"
+      - wait_template: "{{ not is_state('vacuum.xiaomi_vacuum', 'docked') }}"
+      - service: vacuum.xiaomi_remote_control_move_step
+        data:
+          entity_id: vacuum.xiaomi_vacuum
+          velocity: 0.29
+          rotation: 0
+          duration: 2500
+      - wait_template: "{{ is_state('vacuum.xiaomi_vacuum', 'idle') }}"
+        timeout: '00:00:05'
+      - service: script.vacuum_close_garage
+      - wait_template: "{{ is_state('switch.vacuum_garage', 'off') }}"
+
+  vacuum_return_to_base:
+    sequence:
+      - condition: template
+        value_template: "{{ not is_state('vacuum.xiaomi_vacuum', 'docked') }}"
+      - service: script.vacuum_open_garage
+      - service: automation.turn_off
+        entity_id: automation.returning_to_base
+      - service: vacuum.return_to_base
+        entity_id: vacuum.xiaomi_vacuum
+      - wait_template: "{{ is_state('vacuum.xiaomi_vacuum', 'returning') }}"
+      - wait_template: "{{ not is_state('vacuum.xiaomi_vacuum', 'returning') }}"
+      - service: script.vacuum_close_garage
+      - service: automation.turn_on
+        entity_id: automation.returning_to_base
+
+  vacuum_emptying:
+    sequence:
+      - service: vacuum.stop
+        data:
+          entity_id: vacuum.xiaomi_vacuum
+      - service: script.vacuum_leave_garage
+      - wait_template: "{{ is_state('script.vacuum_leave_garage', 'on') }}"
+      - wait_template: "{{ is_state('script.vacuum_leave_garage', 'off') }}"
+      - service: vacuum.send_command
+        data:
+          entity_id: vacuum.xiaomi_vacuum
+          command: app_goto_target
+          params: [28000,28350]
+
+
+automation:
+  - alias: vacuum_returning_to_base
+    initial_state: 'on'
+    trigger:
+     - platform: state
+       entity_id: vacuum.xiaomi_vacuum
+       to: 'returning'
+    action:
+      - service: script.vacuum_open_garage
+      - wait_template: "{{ not is_state('vacuum.xiaomi_vacuum', 'returning') }}"
+      - service: script.vacuum_close_garage
