@@ -1,0 +1,48 @@
+esphome:
+  name: sonoff_sv
+  platform: ESP8266
+  board: esp01_1m
+
+wifi:
+  ssid: ""
+  password: ""
+
+logger:
+
+api:
+
+ota:
+
+binary_sensor:
+  - platform: gpio
+    name: Vacuum garage
+    id: vacuum_garage
+    pin:
+      number: GPIO14
+      inverted: False
+      mode: INPUT_PULLUP
+
+sensor:
+  - platform: uptime
+    name: Sonoff SV Uptime Sensor
+
+switch:
+  - platform: gpio
+    pin: GPIO12
+    id: output
+  - platform: template
+    name: Vacuum garage
+    lambda: |-
+      if (id(vacuum_garage).state) {
+        return true;
+      } else {
+        return false;
+      }
+    turn_on_action:
+      - switch.turn_on: output
+      - delay: 500ms
+      - switch.turn_off: output
+    turn_off_action:
+      - switch.turn_on: output
+      - delay: 500ms
+      - switch.turn_off: output
